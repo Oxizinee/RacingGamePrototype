@@ -5,57 +5,88 @@ using UnityEngine.UIElements;
 
 public class CarControll : MonoBehaviour
 {
-    // Settings
-    public float MoveSpeed = 50;
-    public float MaxSpeed = 15;
-    public float Drag = 0.98f;
-    public float SteerAngle = 20;
-    public float Traction = 1;
-    public float RotationSpeed = 20;
+    public float fwdSpeed;
+    public float revSpeed;
+    public float turnSpeed;
+    public LayerMask groundLayer;
 
-    // Variables
-    private Vector3 MoveForce;
+    private float moveInput;
+    private float turnInput;
+    public bool isCarGrounded;
 
-    public Transform followTransform;
-    public GameObject CenterAim;
+    private float normalDrag;
+    public float modifiedDrag;
 
-    private CarInput _carInput; 
+    public float alignToGroundTime;
+
+    //Swinging
+    public float SwingSpeed;
+    public bool Swinging;
+    public bool IsInSwingingRadius = false;
+
+
+    public LayerMask floorMask;
+    public bool isUpsideDown = false;
+    public float _resetTimer = 3;
+
+    public Rigidbody rb;
     private void Awake()
     {
-        _carInput = GetComponent<CarInput>();
-    }
-    void FixedUpdate()
-    {
-
-        // Moving
-        MoveForce += transform.forward * MoveSpeed * Input.GetAxis("Vertical") * Time.deltaTime;
-        transform.position += MoveForce * Time.deltaTime;
-
-        // Steering
-        float steerInput = Input.GetAxis("Horizontal");
-        transform.Rotate(Vector3.up * steerInput * MoveForce.magnitude * SteerAngle * Time.deltaTime);
-
-        // Drag and max speed limit
-        MoveForce *= Drag;
-        MoveForce = Vector3.ClampMagnitude(MoveForce, MaxSpeed);
-
-        // Traction
-        Debug.DrawRay(transform.position, MoveForce.normalized * 3);
-        Debug.DrawRay(transform.position, transform.forward * 3, Color.blue);
-        MoveForce = Vector3.Lerp(MoveForce.normalized, transform.forward, Traction * Time.deltaTime) * MoveForce.magnitude;
+        rb.transform.parent = null;
+        normalDrag = rb.drag;
     }
     private void Update()
     {
-        Vector2 mousePosition = Camera.main.ScreenToViewportPoint(Input.mousePosition);
-        if (_carInput.IsAiming)
+        // Get input from the player
+        moveInput = Input.GetAxis("Vertical");
+        turnInput = Input.GetAxis("Horizontal");
+
+        float newRot = turnInput * turnSpeed * Time.deltaTime * moveInput;
+
+        if (isCarGrounded)
+            transform.Rotate(0, newRot, 0, Space.World);
+
+        // Set Cars Position to Our Sphere
+        transform.position = rb.transform.position;
+
+        // Raycast to the ground and get normal to align car with it.
+        RaycastHit hit;
+        isCarGrounded = Physics.Raycast(transform.position, -transform.up, out hit, 1f, groundLayer);
+
+        // Rotate Car to align with ground
+        Quaternion toRotateTo = Quaternion.FromToRotation(transform.up, hit.normal) * transform.rotation;
+        transform.rotation = Quaternion.Slerp(transform.rotation, toRotateTo, alignToGroundTime * Time.deltaTime);
+
+        // Calculate Movement Direction
+        moveInput *= moveInput > 0 ? fwdSpeed : revSpeed;
+
+        // Calculate Drag
+        rb.drag = isCarGrounded ? normalDrag : modifiedDrag;
+
+        FlipBackUp();
+
+    }
+
+    private void FlipBackUp()
+    {
+        if (isUpsideDown)
         {
-            CenterAim.SetActive(true);
-            followTransform.transform.localEulerAngles = new Vector3(-mousePosition.y * RotationSpeed, mousePosition.x * RotationSpeed, followTransform.transform.localEulerAngles.z); 
-        }
-        else
-        {
-            CenterAim.SetActive(false);
-            followTransform.transform.localEulerAngles = new Vector3(0,0,0);
+            _resetTimer -= Time.deltaTime;
+            if (_resetTimer < 0)
+            {
+                transform.rotation = Quaternion.identity;
+                _resetTimer = 3;
+                isUpsideDown = false;
+            }
         }
     }
+
+    private void FixedUpdate()
+    {
+        if (isCarGrounded)
+            rb.AddForce(transform.forward * moveInput, ForceMode.Acceleration); // Add Movement
+        else
+            rb.AddForce(transform.up * -200f); // Add Gravity
+    }
+
 }
