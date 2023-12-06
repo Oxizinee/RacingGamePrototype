@@ -5,9 +5,12 @@ using UnityEngine.UIElements;
 
 public class CarControll : MonoBehaviour
 {
-    public float fwdSpeed;
-    public float revSpeed;
-    public float turnSpeed;
+    [Header("Tires")]
+    public GameObject[] Wheels;
+    public Transform direction;
+
+    public float forwardSpeed;
+    public float reverseSpeed;
     public LayerMask groundLayer;
 
     private float moveInput;
@@ -17,23 +20,26 @@ public class CarControll : MonoBehaviour
     private float normalDrag;
     public float modifiedDrag;
 
-    public float alignToGroundTime;
+    //Steering
+    public float currentSpeed;
+    public float speed = 200;
+    public float maxVelocity =50;
+    public float rotationSpeed = 35;
 
-    //Swinging
+    ///Swinging
     public float SwingSpeed;
     public bool Swinging;
     public bool IsInSwingingRadius = false;
 
-
-    public LayerMask floorMask;
+    //Fliping back up
     public bool isUpsideDown = false;
-    public float _resetTimer = 3;
+    public float _resetCarTimer = 3;
 
     public Rigidbody rb;
     private void Awake()
     {
-        rb.transform.parent = null;
-        normalDrag = rb.drag;
+        rb = GetComponent<Rigidbody>();
+          normalDrag = rb.drag;
     }
     private void Update()
     {
@@ -41,41 +47,29 @@ public class CarControll : MonoBehaviour
         moveInput = Input.GetAxis("Vertical");
         turnInput = Input.GetAxis("Horizontal");
 
-        float newRot = turnInput * turnSpeed * Time.deltaTime * moveInput;
-
-        if (isCarGrounded)
-            transform.Rotate(0, newRot, 0, Space.World);
-
-        // Set Cars Position to Our Sphere
-        transform.position = rb.transform.position;
-
+        currentSpeed = rb.velocity.magnitude;
         // Raycast to the ground and get normal to align car with it.
         RaycastHit hit;
         isCarGrounded = Physics.Raycast(transform.position, -transform.up, out hit, 1f, groundLayer);
 
-        // Rotate Car to align with ground
-        Quaternion toRotateTo = Quaternion.FromToRotation(transform.up, hit.normal) * transform.rotation;
-        transform.rotation = Quaternion.Slerp(transform.rotation, toRotateTo, alignToGroundTime * Time.deltaTime);
-
         // Calculate Movement Direction
-        moveInput *= moveInput > 0 ? fwdSpeed : revSpeed;
+        moveInput *= moveInput > 0 ? forwardSpeed : reverseSpeed;
 
-        // Calculate Drag
-        rb.drag = isCarGrounded ? normalDrag : modifiedDrag;
+        //    // Calculate Drag
+           rb.drag = isCarGrounded ? normalDrag : modifiedDrag;
 
         FlipBackUp();
-
     }
 
     private void FlipBackUp()
     {
         if (isUpsideDown)
         {
-            _resetTimer -= Time.deltaTime;
-            if (_resetTimer < 0)
+            _resetCarTimer -= Time.deltaTime;
+            if (_resetCarTimer < 0)
             {
                 transform.rotation = Quaternion.identity;
-                _resetTimer = 3;
+                _resetCarTimer = 3;
                 isUpsideDown = false;
             }
         }
@@ -83,10 +77,44 @@ public class CarControll : MonoBehaviour
 
     private void FixedUpdate()
     {
-        if (isCarGrounded)
-            rb.AddForce(transform.forward * moveInput, ForceMode.Acceleration); // Add Movement
-        else
-            rb.AddForce(transform.up * -200f); // Add Gravity
-    }
+        MoveForward();
 
+        RotateCar(turnInput);
+        RotateWheels();
+
+    }
+    private void MoveForward()
+    {
+        if (Swinging) return;
+
+        if (rb.velocity.magnitude >= maxVelocity)
+        {
+            rb.velocity = rb.velocity.normalized * maxVelocity;
+        }
+
+        if (isCarGrounded)
+        {
+            rb.AddForce(moveInput * transform.forward * rb.mass * speed * Time.fixedDeltaTime, ForceMode.Force);
+        }
+        else
+        {
+            rb.AddForce(transform.up * -500f);
+        }
+    }
+    void RotateCar(float input)
+    {
+        if (rb.velocity.magnitude >= 0.5f)
+        {
+            transform.Rotate(0, 30f * Time.deltaTime * input, 0);
+        }
+    }
+    private void RotateWheels()
+    {
+        foreach (GameObject w in Wheels)
+        {
+            w.transform.Rotate(0, rb.velocity.magnitude * 0.1f * Time.fixedTime, 0);
+        }
+    }
 }
+
+

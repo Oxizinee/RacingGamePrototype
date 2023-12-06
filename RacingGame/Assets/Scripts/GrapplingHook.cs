@@ -40,7 +40,14 @@ public class GrapplingHook : MonoBehaviour
             StopSwing();
         }
 
-        if (joint != null) OdmGearMovement();
+        //if (joint != null) OdmGearMovement();
+    }
+    private void FixedUpdate()
+    {
+        if (CarControll.Swinging)
+        {
+            rb.AddForce(orientation.forward * forwardThrustForce * Time.deltaTime, ForceMode.VelocityChange);
+        }
     }
 
     private void LateUpdate()
@@ -52,36 +59,32 @@ public class GrapplingHook : MonoBehaviour
     {
         if (!joint) return;
 
-        _currentGrapplePos =
-            Vector3.Lerp(_currentGrapplePos, swingPoint, Time.deltaTime * 8f);
-
+        lineRenderer.positionCount = 2;
         lineRenderer.SetPosition(0, gunTip.position);
-        lineRenderer.SetPosition(1, _currentGrapplePos);
+        lineRenderer.SetPosition(1, Target.transform.position);
     }
     private void StartSwing()
     {
-        CarControll.Swinging = true;
-
         RaycastHit hit;
-        if (Physics.Raycast(gunTip.transform.position, Target.transform.position, out hit, maxSwingDistance, Grappleable))
+        if (Physics.Raycast(gunTip.transform.position, Target.transform.position, out hit, float.PositiveInfinity, Grappleable))
         {
+            Debug.DrawRay(gunTip.transform.position, hit.point * hit.distance, Color.yellow);
             swingPoint = hit.point;
-            joint = player.gameObject.AddComponent<SpringJoint>();
+            player.gameObject.AddComponent<SpringJoint>();
+            joint = player.GetComponent<SpringJoint>();
             joint.autoConfigureConnectedAnchor = false;
-            joint.connectedAnchor = swingPoint;
+            joint.connectedAnchor = Target.transform.position;
 
             float distance = Vector3.Distance(player.position, swingPoint);
 
-            joint.maxDistance = distance * 0.8f;
+            joint.maxDistance = distance * 0.4f;
             joint.minDistance = distance * 0.25f;
 
             //customize
-            joint.spring = 4.5f;
-            joint.damper = 7;
-            joint.massScale = 4.5f;
+            joint.damper = 4.5f;
 
-            lineRenderer.positionCount = 2;
             _currentGrapplePos = gunTip.position;
+            CarControll.Swinging = true;
         }
     }
     private void StopSwing()
@@ -110,16 +113,16 @@ public class GrapplingHook : MonoBehaviour
 
             float distanceFromPoint = Vector3.Distance(transform.position, swingPoint);
 
-            joint.maxDistance = distanceFromPoint * 0.8f;
-            joint.minDistance = distanceFromPoint * 0.25f;
+          //  joint.maxDistance = distanceFromPoint * 0.8f;
+          //  joint.minDistance = distanceFromPoint * 0.25f;
         }
         // extend cable
         if (Input.GetKey(KeyCode.S))
         {
             float extendedDistanceFromPoint = Vector3.Distance(transform.position, swingPoint) + extendCableSpeed;
 
-            joint.maxDistance = extendedDistanceFromPoint * 0.8f;
-            joint.minDistance = extendedDistanceFromPoint * 0.25f;
+       //     joint.maxDistance = extendedDistanceFromPoint * 0.8f;
+         //   joint.minDistance = extendedDistanceFromPoint * 0.25f;
         }
     }
 }

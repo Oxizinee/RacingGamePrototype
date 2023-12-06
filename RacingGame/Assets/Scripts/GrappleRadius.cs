@@ -7,6 +7,14 @@ public class GrappleRadius : MonoBehaviour
     // Start is called before the first frame update
     public GameObject shower;
     public GameObject target;
+    public GameObject mainCamera;
+    public GameObject zoomOutCamera;
+
+    private void OnTriggerEnter(Collider other)
+    {
+        mainCamera.SetActive(false);
+        zoomOutCamera.SetActive(true);
+    }
     private void OnTriggerStay(Collider other)
     {
         if (other.gameObject.gameObject.tag == "Player")
@@ -20,6 +28,8 @@ public class GrappleRadius : MonoBehaviour
     {
         if (other.gameObject.gameObject.tag == "Player")
         {
+            mainCamera.SetActive(true);
+            zoomOutCamera.SetActive(false);
             other.gameObject.GetComponentInParent<CarControll>().IsInSwingingRadius = false;
             shower.SetActive(false);
         }
