@@ -1,3 +1,4 @@
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
@@ -5,62 +6,98 @@ using UnityEngine.UIElements;
 
 public class CarControll : MonoBehaviour
 {
+    public float gravity;
+    public GameObject groundCheck;
+    public GameObject start;
     [Header("Tires")]
     public GameObject[] Wheels;
     public Transform direction;
 
+    [Header("Speed")]
     public float forwardSpeed;
     public float reverseSpeed;
+    public float drifitingSpeed;
     public LayerMask groundLayer;
 
-    private float moveInput;
+    [Header("Movement")]
+    private Vector2 moveInput;
     private float turnInput;
     public bool isCarGrounded;
+    public bool drift = false;
+    public bool respawn = false;
 
+    [Header("Drag")]
     private float normalDrag;
-    public float modifiedDrag;
+    public float airDrag;
+    public float snapDistance = 2f;
 
-    //Steering
+    [Header("Sterring")]
     public float currentSpeed;
-    public float speed = 200;
-    public float maxVelocity =50;
+    public float maxVelocity = 250;
     public float rotationSpeed = 35;
 
-    ///Swinging
-    public float SwingSpeed;
+    [Header("Swinging")]
     public bool Swinging;
     public bool IsInSwingingRadius = false;
 
-    //Fliping back up
+    [Header("Flipping back up")]
     public bool isUpsideDown = false;
     public float _resetCarTimer = 3;
 
     public Rigidbody rb;
+
+    private void OnTriggerEnter(Collider other)
+    {
+        if (other.gameObject.tag == "Respawn")
+        {
+            respawn = true;
+        }
+    }
     private void Awake()
     {
         rb = GetComponent<Rigidbody>();
-          normalDrag = rb.drag;
+        normalDrag = rb.drag;
     }
     private void Update()
     {
         // Get input from the player
-        moveInput = Input.GetAxis("Vertical");
+        moveInput = new Vector2(Input.GetAxis("RightTriggerAxis"), Input.GetAxis("LeftTriggerAxis")); //Input.GetAxis("Vertical");
         turnInput = Input.GetAxis("Horizontal");
 
-        currentSpeed = rb.velocity.magnitude;
-        // Raycast to the ground and get normal to align car with it.
-        RaycastHit hit;
-        isCarGrounded = Physics.Raycast(transform.position, -transform.up, out hit, 1f, groundLayer);
+        // Raycast to the ground and get normal to align car with it - normal ground Check!
+           RaycastHit hit;
+           isCarGrounded = Physics.Raycast(transform.position, -transform.up, out hit, 1f, groundLayer);
+
+
+        // Snapping the car to the surface
+        SnapToSurface();
+       
 
         // Calculate Movement Direction
-        moveInput *= moveInput > 0 ? forwardSpeed : reverseSpeed;
+        moveInput *= moveInput.x > 0 ? forwardSpeed : reverseSpeed;
 
-        //    // Calculate Drag
-           rb.drag = isCarGrounded ? normalDrag : modifiedDrag;
+        //   // Calculate Drag
+        rb.drag = isCarGrounded ? normalDrag : airDrag;
 
         FlipBackUp();
+        Respawn();
     }
-
+    private void Respawn()
+    {
+        if (respawn)
+        {
+            transform.position = start.transform.position;
+            transform.rotation = start.transform.rotation;
+            currentSpeed = 0;
+            float t = 0;
+            //if (t < 6)
+            //{
+            //    t += Time.deltaTime * 0.5f;
+            //    currentSpeed = 0;
+            //}
+            respawn = false;
+        }
+    }
     private void FlipBackUp()
     {
         if (isUpsideDown)
@@ -68,48 +105,116 @@ public class CarControll : MonoBehaviour
             _resetCarTimer -= Time.deltaTime;
             if (_resetCarTimer < 0)
             {
-                transform.rotation = Quaternion.identity;
+                if (transform.rotation.y >= 0)
+                {
+                    transform.rotation = Quaternion.Euler(transform.rotation.x, 0, transform.rotation.z);
+                }
+                else
+                {
+                    transform.rotation = Quaternion.Euler(transform.rotation.x, -180, transform.rotation.z);
+                }
                 _resetCarTimer = 3;
                 isUpsideDown = false;
             }
         }
     }
+    private void SnapToSurface()
+    {
+        RaycastHit hit;
 
+        // Raycast downwards to detect the surface below the car
+        if (Physics.Raycast(transform.position, -transform.up, out hit, 0.5f, groundLayer))
+        {
+            // Calculate the distance between the car and the surface
+            float distanceToSurface = hit.distance;
+
+            // Snap the car to the surface if it's below the snap distance
+            if (distanceToSurface < snapDistance)
+            {
+                groundCheck.transform.position = new Vector3(groundCheck.transform.position.x, hit.point.y, groundCheck.transform.position.z); // Snap to the surface
+                transform.up = hit.normal;      // Align with the surface normal
+            }
+        }
+    }
     private void FixedUpdate()
     {
-        MoveForward();
+        Move();
 
         RotateCar(turnInput);
         RotateWheels();
 
+        MidAirControl();
+
     }
-    private void MoveForward()
+    private void MidAirControl()
+    {
+        if (!isCarGrounded || !respawn)
+        {
+            //Vector3 currentRotation = transform.rotation.eulerAngles;
+            //float clampedPitch = Mathf.Clamp(currentRotation.x, -maxPitchAngle, maxPitchAngle);
+
+            //Quaternion targetRotation = Quaternion.Euler(clampedPitch, currentRotation.y, currentRotation.z);
+            //transform.rotation = Quaternion.Slerp(transform.rotation, targetRotation, Time.deltaTime * 5f);
+
+            rb.AddTorque(Vector3.Cross(transform.up, Vector3.up) * 5f);
+        }
+    }
+    private void Move()
     {
         if (Swinging) return;
-
-        if (rb.velocity.magnitude >= maxVelocity)
-        {
-            rb.velocity = rb.velocity.normalized * maxVelocity;
-        }
+        if(respawn) return;
 
         if (isCarGrounded)
         {
-            rb.AddForce(moveInput * transform.forward * rb.mass * speed * Time.fixedDeltaTime, ForceMode.Force);
+            if (moveInput.x > 0)
+            {
+                currentSpeed = Mathf.Lerp(currentSpeed, maxVelocity, Time.deltaTime * 0.5f);
+            }
+            else if (moveInput.y > 0)
+            {
+                currentSpeed = Mathf.Lerp(currentSpeed, -maxVelocity / 1.75f, 1f * Time.deltaTime);
+            }
+            else
+            {
+                currentSpeed = Mathf.Lerp(currentSpeed, 0, Time.deltaTime * 1.5f);
+            }
+
+            rb.AddForce(transform.forward * currentSpeed, ForceMode.Acceleration);
         }
-        else
+
+        else //add gravity
         {
-            rb.AddForce(transform.up * -500f);
+            rb.AddForce(-transform.up * gravity);
         }
     }
     void RotateCar(float input)
     {
+        if (respawn) return;
+
+
         if (rb.velocity.magnitude >= 0.5f)
         {
-            transform.Rotate(0, 30f * Time.deltaTime * input, 0);
+            transform.Rotate(0, rotationSpeed * Time.deltaTime * input, 0);
+
+            if (Input.GetButton("Fire2"))
+            {
+                drift = true;
+                rotationSpeed = 85;
+                currentSpeed = Mathf.Lerp(currentSpeed, drifitingSpeed, 2f * Time.deltaTime);
+            }
+            else
+            {
+                drift = false;
+                rotationSpeed = 70;
+            }
         }
+
     }
     private void RotateWheels()
     {
+        if(respawn) return;
+
+
         foreach (GameObject w in Wheels)
         {
             w.transform.Rotate(0, rb.velocity.magnitude * 0.1f * Time.fixedTime, 0);
