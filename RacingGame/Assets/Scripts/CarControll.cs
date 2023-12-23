@@ -42,7 +42,7 @@ public class CarControll : MonoBehaviour
 
     [Header("Flipping back up")]
     public bool isUpsideDown = false;
-    public float _resetCarTimer = 3;
+    public float _resetCarTimer = 2;
 
     public Rigidbody rb;
 
@@ -100,22 +100,34 @@ public class CarControll : MonoBehaviour
     }
     private void FlipBackUp()
     {
-        if (isUpsideDown)
+        if (Input.GetButtonDown("Fire3"))
         {
-            _resetCarTimer -= Time.deltaTime;
-            if (_resetCarTimer < 0)
+            isUpsideDown = true;
+        }
+        if (Input.GetButton("Fire3"))
+        {
+            if (isUpsideDown)
             {
-                if (transform.rotation.y >= 0)
+                _resetCarTimer -= Time.deltaTime * 2f;
+                if (_resetCarTimer < 0)
                 {
-                    transform.rotation = Quaternion.Euler(transform.rotation.x, 0, transform.rotation.z);
+                    if (transform.rotation.y >= 0)
+                    {
+                        transform.rotation = Quaternion.Euler(transform.rotation.x, 0, transform.rotation.z);
+                    }
+                    else
+                    {
+                        transform.rotation = Quaternion.Euler(transform.rotation.x, -180, transform.rotation.z);
+                    }
+                    _resetCarTimer = 2;
+                    isUpsideDown = false;
                 }
-                else
-                {
-                    transform.rotation = Quaternion.Euler(transform.rotation.x, -180, transform.rotation.z);
-                }
-                _resetCarTimer = 3;
-                isUpsideDown = false;
             }
+        }
+        else
+        {
+            isUpsideDown=false;
+            _resetCarTimer = 2;
         }
     }
     private void SnapToSurface()
