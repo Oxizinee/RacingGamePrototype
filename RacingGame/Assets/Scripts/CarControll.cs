@@ -9,8 +9,10 @@ public class CarControll : MonoBehaviour
     public float gravity;
     public GameObject groundCheck;
     public GameObject start;
+
     [Header("Tires")]
     public GameObject[] Wheels;
+    public TrailRenderer[] SkidMarks;
     public Transform direction;
 
     [Header("Speed")]
@@ -80,8 +82,39 @@ public class CarControll : MonoBehaviour
         rb.drag = isCarGrounded ? normalDrag : airDrag;
 
         FlipBackUp();
+        CheckDrifting(); // skid marks
         Respawn();
     }
+
+   
+    private void CheckDrifting()
+    {
+        if (drift)
+        {
+            startEmmiter();
+        }
+        else
+        {
+            stopEmmiter();
+        }
+    }
+
+    private void startEmmiter()
+    {
+        foreach (TrailRenderer trail in SkidMarks)
+        {
+            trail.emitting = true;
+        }
+    }
+
+    private void stopEmmiter()
+    {
+        foreach (TrailRenderer trail in SkidMarks)
+        {
+            trail.emitting = false;
+        }
+    }
+
     private void Respawn()
     {
         if (respawn)
@@ -89,12 +122,7 @@ public class CarControll : MonoBehaviour
             transform.position = start.transform.position;
             transform.rotation = start.transform.rotation;
             currentSpeed = 0;
-            float t = 0;
-            //if (t < 6)
-            //{
-            //    t += Time.deltaTime * 0.5f;
-            //    currentSpeed = 0;
-            //}
+            
             respawn = false;
         }
     }
@@ -208,6 +236,8 @@ public class CarControll : MonoBehaviour
         {
             transform.Rotate(0, rotationSpeed * Time.deltaTime * input, 0);
 
+
+            //Drifting
             if (Input.GetButton("Fire2"))
             {
                 drift = true;
