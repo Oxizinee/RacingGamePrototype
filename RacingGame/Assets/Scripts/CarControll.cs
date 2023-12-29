@@ -3,12 +3,23 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UIElements;
+using Cinemachine;
 
 public class CarControll : MonoBehaviour
 {
     public float gravity;
     public GameObject groundCheck;
     public GameObject start;
+
+    public CinemachineVirtualCamera CarCamera;
+    public float maxFOV = 83;
+
+    [Header("Checkpoints")]
+    public GameObject[] Checkpoints;
+    public GameObject[] SpawnPoints;
+    public bool Start=true;
+    public bool Checkpoint1;
+    public bool Checkpoint2;
 
     [Header("Tires")]
     public GameObject[] Wheels;
@@ -54,6 +65,18 @@ public class CarControll : MonoBehaviour
         {
             respawn = true;
         }
+
+        if (other.gameObject == Checkpoints[0].gameObject)
+        {
+            Checkpoint1 = true;
+            Start = false;
+        }
+        if (other.gameObject == Checkpoints[1].gameObject)
+        {
+            Checkpoint2 = true;
+            Checkpoint1 = false;
+        }
+        
     }
     private void Awake()
     {
@@ -67,13 +90,13 @@ public class CarControll : MonoBehaviour
         turnInput = Input.GetAxis("Horizontal");
 
         // Raycast to the ground and get normal to align car with it - normal ground Check!
-           RaycastHit hit;
-           isCarGrounded = Physics.Raycast(transform.position, -transform.up, out hit, 1f, groundLayer);
+        RaycastHit hit;
+        isCarGrounded = Physics.Raycast(transform.position, -transform.up, out hit, 1f, groundLayer);
 
 
         // Snapping the car to the surface
         SnapToSurface();
-       
+
 
         // Calculate Movement Direction
         moveInput *= moveInput.x > 0 ? forwardSpeed : reverseSpeed;
@@ -81,19 +104,32 @@ public class CarControll : MonoBehaviour
         //   // Calculate Drag
         rb.drag = isCarGrounded ? normalDrag : airDrag;
 
+        CameraZoomOut();
+
         FlipBackUp();
         CheckDrifting(); // skid marks
         Respawn();
     }
 
-   
+    private void CameraZoomOut()
+    {
+        if (currentSpeed > 140)
+        {
+            CarCamera.m_Lens.FieldOfView = Mathf.Lerp(CarCamera.m_Lens.FieldOfView, maxFOV, Time.deltaTime * 1f);
+        }
+        else
+        {
+            CarCamera.m_Lens.FieldOfView = Mathf.Lerp(CarCamera.m_Lens.FieldOfView, 53.45f, Time.deltaTime * 1);
+        }
+    }
+
     private void CheckDrifting()
     {
-        if (drift)
+        if (drift && isCarGrounded)
         {
             startEmmiter();
         }
-        else
+        else if(!drift || !isCarGrounded)
         {
             stopEmmiter();
         }
@@ -119,8 +155,23 @@ public class CarControll : MonoBehaviour
     {
         if (respawn)
         {
-            transform.position = start.transform.position;
-            transform.rotation = start.transform.rotation;
+            if (Checkpoint1)
+            {
+                transform.position = SpawnPoints[0].transform.position;
+                transform.rotation = SpawnPoints[0].transform.rotation;
+            }
+            if (Checkpoint2)
+            {
+                transform.position = SpawnPoints[1].transform.position;
+                transform.rotation = SpawnPoints[1].transform.rotation;
+            }
+           
+            else if(Start)
+            {
+                transform.position = start.transform.position;
+                transform.rotation = start.transform.rotation;
+            }
+            
             currentSpeed = 0;
             
             respawn = false;
